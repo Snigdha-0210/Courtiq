@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+nba_api
+pandas
+numpy
+scikit-learn
+xgboost
+basketball_reference_web_scraper
+sqlalchemy
+psycopg2-binary
+python-dotenv
+apscheduler
