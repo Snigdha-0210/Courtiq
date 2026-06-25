@@ -165,7 +165,7 @@ export default function Home() {
           {GAMES.filter(g => g.live)[0] && (() => {
             const g = GAMES.filter(g => g.live)[0];
             return (
-              <div className="w-full md:w-72 bg-black border border-gray-700 rounded p-5 flex-shrink-0">
+              <div onClick={() => window.location.href = "/game/" + g.id} className="w-full md:w-72 bg-black border border-gray-700 rounded p-5 flex-shrink-0 cursor-pointer hover:border-gray-600 transition-all">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[10px] text-red font-black tracking-widest">● LIVE NOW</span>
                   <span className="text-[10px] text-gray-500 font-bold">{g.status}</span>
@@ -212,7 +212,7 @@ export default function Home() {
         <div className="flex-1 border-r border-gray-800">
           {/* Games */}
           <div className="p-6 border-b border-gray-800">
-            <SectionHeader title="Today's Games" />
+            <SectionHeader title="Recent & Live Games" />
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {GAMES.map(g => <GameCard key={g.id} game={g} />)}
             </div>

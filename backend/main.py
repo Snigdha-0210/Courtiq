@@ -34,6 +34,14 @@ app.add_middleware(
 def get_games(db: Session = Depends(get_db)):
     return db.query(models.Game).all()
 
+@app.get("/api/games/{game_id}")
+def get_game_boxscore(game_id: str):
+    from pipeline.nba_fetcher import fetch_boxscore
+    box = fetch_boxscore(game_id)
+    if box:
+        return box
+    return {"error": "Failed to fetch boxscore"}
+
 @app.get("/api/standings", response_model=schemas.StandingsResponse)
 def get_standings(db: Session = Depends(get_db)):
     east = db.query(models.Standing).filter(models.Standing.conference == "EAST").all()

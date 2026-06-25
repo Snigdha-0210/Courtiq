@@ -10,7 +10,7 @@ class GameSchema(BaseModel):
     home: str
     away: str
     hs: int
-    as_: int = Field(..., alias="as") # Python keyword
+    as_: int = Field(..., validation_alias="as_score", serialization_alias="as")
     status: str
     live: bool
     arena: str

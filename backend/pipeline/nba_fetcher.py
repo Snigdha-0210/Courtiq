@@ -1,59 +1,96 @@
-from nba_api.stats.endpoints import scoreboardv2, leaguestandingsv3, leagueleaders, commonplayerinfo, playerprofilev2, shotchartdetail, leaguedashteamstats, leaguedashplayerstats
+from nba_api.stats.endpoints import scoreboardv2, leaguestandingsv3, leagueleaders, commonplayerinfo, playerprofilev2, shotchartdetail, leaguedashteamstats, leaguedashplayerstats, playerdashboardbygeneralsplits
 from nba_api.stats.static import players, teams
 from datetime import datetime
 import pandas as pd
 import time
 from model.xpts_model import calculate_xpts
 
-SEASON = "2023-24"
+SEASON = "2024-25"
 
 def fetch_live_games():
-    """Fetches today's games and returns them in the frontend Game schema."""
+    """Fetches games and returns them in the frontend Game schema."""
+    from nba_api.stats.endpoints import scoreboardv3
+    from datetime import datetime
     try:
-        board = scoreboardv2.ScoreboardV2()
-        games_df = board.get_data_frames()[0]  # GameHeader
-        linescore_df = board.get_data_frames()[1] # LineScore
+        # Since it's off-season, use a 3-day window of the playoffs so we have finished, live, and upcoming
+        dates = ['2024-05-18', '2024-05-19', '2024-05-20']
         
+        all_games = []
+        for d in dates:
+            board = scoreboardv3.ScoreboardV3(game_date=d)
+            all_games.extend(board.get_dict().get('scoreboard', {}).get('games', []))
+            
         formatted_games = []
-        for _, game in games_df.iterrows():
-            game_id = game['GAME_ID']
-            home_team = game['HOME_TEAM_ID']
-            away_team = game['VISITOR_TEAM_ID']
+        for game in all_games:
+            home = game['homeTeam']
+            away = game['awayTeam']
             
-            h_line = linescore_df[linescore_df['TEAM_ID'] == home_team]
-            a_line = linescore_df[linescore_df['TEAM_ID'] == away_team]
+            h_qtrs = [p.get('score', 0) for p in home.get('periods', [])]
+            a_qtrs = [p.get('score', 0) for p in away.get('periods', [])]
             
-            if not h_line.empty and not a_line.empty:
-                h_line = h_line.iloc[0]
-                a_line = a_line.iloc[0]
-                
-                h_qtrs = [h_line.get('PTS_QTR1', 0), h_line.get('PTS_QTR2', 0), h_line.get('PTS_QTR3', 0), h_line.get('PTS_QTR4', 0)]
-                a_qtrs = [a_line.get('PTS_QTR1', 0), a_line.get('PTS_QTR2', 0), a_line.get('PTS_QTR3', 0), a_line.get('PTS_QTR4', 0)]
-                
-                # Replace None with 0
-                h_qtrs = [x if pd.notna(x) else 0 for x in h_qtrs]
-                a_qtrs = [x if pd.notna(x) else 0 for x in a_qtrs]
-                
-                formatted_games.append({
-                    "id": int(game_id),
-                    "home": h_line['TEAM_ABBREVIATION'],
-                    "away": a_line['TEAM_ABBREVIATION'],
-                    "hs": int(h_line.get('PTS', 0) if pd.notna(h_line.get('PTS', 0)) else 0),
-                    "as_score": int(a_line.get('PTS', 0) if pd.notna(a_line.get('PTS', 0)) else 0),
-                    "status": game['GAME_STATUS_TEXT'],
-                    "live": game['GAME_STATUS_ID'] == 2,
-                    "arena": game['ARENA_NAME'],
-                    "broadcast": "Local" if not game['NATL_TV_BROADCASTER_ABBREVIATION'] else game['NATL_TV_BROADCASTER_ABBREVIATION'],
-                    "hRec": f"{h_line.get('TEAM_WINS_LOSSES', '0-0')}",
-                    "aRec": f"{a_line.get('TEAM_WINS_LOSSES', '0-0')}",
-                    "hLeader": "â€”", # Requires another API call to get player stats for live game
-                    "aLeader": "â€”",
-                    "qtrs": { "h": h_qtrs, "a": a_qtrs }
-                })
+            # pad to at least 4 quarters
+            while len(h_qtrs) < 4: h_qtrs.append(0)
+            while len(a_qtrs) < 4: a_qtrs.append(0)
+            
+            broadcasters = game.get('broadcasters', {}).get('nationalBroadcasters', [])
+            broadcast = broadcasters[0].get('broadcastDisplay', 'Local') if broadcasters else "Local"
+            
+            formatted_games.append({
+                "id": int(game['gameId']),
+                "home": home['teamTricode'],
+                "away": away['teamTricode'],
+                "hs": int(home.get('score', 0)),
+                "as_score": int(away.get('score', 0)),
+                "status": game['gameStatusText'],
+                "live": game['gameStatus'] == 2,
+                "arena": game.get('arena', {}).get('arenaName', 'Arena'),
+                "broadcast": broadcast,
+                "hRec": f"{home.get('wins', 0)}-{home.get('losses', 0)}",
+                "aRec": f"{away.get('wins', 0)}-{away.get('losses', 0)}",
+                "hLeader": "—", # Requires another API call to get player stats for live game
+                "aLeader": "—",
+                "qtrs": { "h": h_qtrs, "a": a_qtrs }
+            })
         return formatted_games
     except Exception as e:
+        import traceback
         print(f"Error fetching live games: {e}")
+        traceback.print_exc()
         return []
+
+def fetch_boxscore(game_id: str):
+    from nba_api.stats.endpoints import boxscoretraditionalv3
+    try:
+        box = boxscoretraditionalv3.BoxScoreTraditionalV3(game_id=game_id).get_dict()
+        box_data = box.get('boxScoreTraditional', {})
+        home = box_data.get('homeTeam', {})
+        away = box_data.get('awayTeam', {})
+        
+        def format_players(team_data):
+            players = team_data.get('players', [])
+            res = []
+            for p in players:
+                res.append({
+                    "name": p.get('nameI', p.get('firstName', '') + ' ' + p.get('familyName', '')),
+                    "pos": p.get('position', ''),
+                    "pts": p.get('statistics', {}).get('points', 0),
+                    "reb": p.get('statistics', {}).get('reboundsTotal', 0),
+                    "ast": p.get('statistics', {}).get('assists', 0),
+                    "fgm": p.get('statistics', {}).get('fieldGoalsMade', 0),
+                    "fga": p.get('statistics', {}).get('fieldGoalsAttempted', 0),
+                    "mins": p.get('statistics', {}).get('minutes', '0:00')
+                })
+            return res
+            
+        return {
+            "home": home.get('teamTricode', 'HOME'),
+            "away": away.get('teamTricode', 'AWAY'),
+            "homePlayers": format_players(home),
+            "awayPlayers": format_players(away)
+        }
+    except Exception as e:
+        print(f"Error fetching boxscore: {e}")
+        return None
 
 def fetch_standings():
     """Fetches standings for East and West."""
@@ -164,17 +201,133 @@ def fetch_player_profile(player_key: str, player_id: int):
             
         career_arr = []
         for _, row in season_totals.iterrows():
+            fga = row.get('FGA', 0)
+            fta = row.get('FTA', 0)
+            pts = row.get('PTS', 0)
+            gp = row.get('GP', 0)
+            reb = row.get('REB', 0)
+            ast = row.get('AST', 0)
+            if gp > 0:
+                tsp = round(pts / (2 * (fga + 0.44 * fta)) * 100, 1) if (fga + 0.44 * fta) > 0 else 0
+                per = round(15.0 + ((pts/gp) - 10) * 0.5 + ((reb/gp) - 4) * 0.3 + ((ast/gp) - 2) * 0.4, 1)
+            else:
+                tsp, per = 0, 0
+                
             career_arr.append({
                 "season": str(row['SEASON_ID']),
-                "gp": int(row['GP']),
-                "pts": float(round(row['PTS']/row['GP'], 1)) if row['GP'] else 0.0,
-                "reb": float(round(row['REB']/row['GP'], 1)) if row['GP'] else 0.0,
-                "ast": float(round(row['AST']/row['GP'], 1)) if row['GP'] else 0.0,
-                "fgp": float(row['FG_PCT'] * 100),
-                "fg3p": float(row['FG3_PCT'] * 100),
-                "ftp": float(row['FT_PCT'] * 100),
+                "gp": int(gp),
+                "pts": float(round(pts/gp, 1)) if gp else 0.0,
+                "reb": float(round(reb/gp, 1)) if gp else 0.0,
+                "ast": float(round(ast/gp, 1)) if gp else 0.0,
+                "fgp": float(round(row['FG_PCT'] * 100, 1)),
+                "fg3p": float(round(row['FG3_PCT'] * 100, 1)),
+                "ftp": float(round(row['FT_PCT'] * 100, 1)),
+                "tsp": float(tsp),
+                "per": float(max(5.0, min(35.0, per)))
             })
             
+        # Fetch gamelog
+        gamelog_arr = []
+        try:
+            from nba_api.stats.endpoints import playergamelog
+            gamelog = playergamelog.PlayerGameLog(player_id=player_id, season=SEASON)
+            gl_df = gamelog.get_data_frames()[0]
+            for _, row in gl_df.head(20).iterrows(): # Return last 20 games
+                matchup = row['MATCHUP']
+                opp = matchup.split(' ')[-1]
+                res = row['WL']
+                gamelog_arr.append({
+                    "date": row['GAME_DATE'],
+                    "opp": opp,
+                    "res": res if res else "-",
+                    "min": int(row['MIN']),
+                    "pts": int(row['PTS']),
+                    "reb": int(row['REB']),
+                    "ast": int(row['AST']),
+                    "fgm": int(row['FGM']),
+                    "fga": int(row['FGA']),
+                    "fg3m": int(row['FG3M']),
+                    "fg3a": int(row['FG3A']),
+                    "ftm": int(row['FTM']),
+                    "fta": int(row['FTA']),
+                    "stl": int(row['STL']),
+                    "blk": int(row['BLK']),
+                    "tov": int(row['TOV']),
+                    "pm": int(row['PLUS_MINUS']) if pd.notna(row['PLUS_MINUS']) else 0
+                })
+        except Exception as e:
+            print(f"Error fetching gamelog for {player_id}: {e}")
+
+        # fetch splits
+        splits_arr = []
+        try:
+            splits_api = playerdashboardbygeneralsplits.PlayerDashboardByGeneralSplits(player_id=player_id, season=SEASON)
+            dfs = splits_api.get_data_frames()
+            overall = dfs[0]
+            location = dfs[1]
+            winloss = dfs[2]
+            
+            def map_split(row, label):
+                fga = row['FGA']
+                fta = row['FTA']
+                pts = row['PTS']
+                tsp = round(pts / (2 * (fga + 0.44 * fta)) * 100, 1) if (fga + 0.44 * fta) > 0 else 0
+                return {
+                    "label": label,
+                    "gp": int(row['GP']),
+                    "pts": float(round(row['PTS'], 1)),
+                    "reb": float(round(row['REB'], 1)),
+                    "ast": float(round(row['AST'], 1)),
+                    "fgp": float(round(row['FG_PCT']*100, 1)),
+                    "fg3p": float(round(row['FG3_PCT']*100, 1)),
+                    "tsp": float(tsp)
+                }
+
+            if not overall.empty:
+                splits_arr.append(map_split(overall.iloc[0], "Overall"))
+            if len(location) >= 2:
+                for _, row in location.iterrows():
+                    splits_arr.append(map_split(row, row['GROUP_VALUE']))
+            if len(winloss) >= 2:
+                for _, row in winloss.iterrows():
+                    splits_arr.append(map_split(row, "In " + row['GROUP_VALUE']))
+        except Exception as e:
+            print(f"Error fetching splits for {player_id}: {e}")
+
+        # fetch shotchart and calculate zones
+        zones_arr = []
+        try:
+            sc = shotchartdetail.ShotChartDetail(player_id=player_id, team_id=0, context_measure_simple='FGA', season_nullable=SEASON)
+            df_sc = sc.get_data_frames()[0]
+            if not df_sc.empty:
+                df_sc = calculate_xpts(df_sc)
+                zone_groups = df_sc.groupby('SHOT_ZONE_BASIC')
+                for zone_name, group in zone_groups:
+                    fga = len(group)
+                    fgm = group['SHOT_MADE_FLAG'].sum()
+                    fgp = round(fgm / fga * 100, 1) if fga > 0 else 0
+                    
+                    xfgp = round(group['xFG_pct'].mean() * 100, 1) if fga > 0 else 0
+                    pts_val_avg = group['pts_value'].mean() if 'pts_value' in group.columns else 2
+                    pps = round(pts_val_avg * (fgm / fga), 2) if fga > 0 else 0
+                    
+                    diff = fgp - xfgp
+                    if diff > 5: rating = "ELITE"
+                    elif diff > 0: rating = "GOOD"
+                    elif diff > -5: rating = "AVG"
+                    else: rating = "POOR"
+                    
+                    zones_arr.append({
+                        "zone": str(zone_name),
+                        "fga": int(fga),
+                        "fgp": float(fgp),
+                        "xfgp": float(xfgp),
+                        "pps": float(pps),
+                        "rating": rating
+                    })
+        except Exception as e:
+            print(f"Error fetching shotchart for {player_id}: {e}")
+
         return {
             "player_key": str(player_key),
             "name": str(info['DISPLAY_FIRST_LAST']),
@@ -192,10 +345,10 @@ def fetch_player_profile(player_key: str, player_id: int):
             "salary": "â€”",
             "season": season_dict,
             "career": career_arr,
-            "gamelog": [], # Need another call for gamelog
-            "splits": [],
+            "gamelog": gamelog_arr,
+            "splits": splits_arr,
             "hustle": {},
-            "zones": [], # Would need shotchart info mapped here
+            "zones": zones_arr,
             "radar": { "scoring": 85, "shooting": 80, "playmaking": 70, "defense": 60, "efficiency": 80 }
         }
     except Exception as e:

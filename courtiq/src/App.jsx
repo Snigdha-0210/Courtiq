@@ -8,6 +8,7 @@ import Standings   from "./pages/Standings";
 import Leaders     from "./pages/Leaders";
 import ShotQuality from "./pages/ShotQuality";
 import Compare     from "./pages/Compare";
+import Game        from "./pages/Game";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/leaders"  element={<Leaders />} />
           <Route path="/xpts"     element={<ShotQuality />} />
           <Route path="/compare"  element={<Compare />} />
+          <Route path="/game/:gameId" element={<Game />} />
         </Routes>
       </div>
     </BrowserRouter>
