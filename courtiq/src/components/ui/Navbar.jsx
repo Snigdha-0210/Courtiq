@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "Leaders",    path: "/leaders" },
   { label: "Shot Quality", path: "/xpts" },
   { label: "Compare",    path: "/compare" },
+  { label: "Predictions",path: "/predictions" },
 ];
 
 export default function Navbar() {

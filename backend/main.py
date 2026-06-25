@@ -119,9 +119,51 @@ def get_team(team_id: str, db: Session = Depends(get_db)):
 @app.get("/api/compare", response_model=Dict[str, schemas.PlayerProfileSchema])
 @ttl_cache(ttl_seconds=60)
 def get_compare(db: Session = Depends(get_db)):
-    # For now, just returning all player profiles as comparison target
     profiles = db.query(models.PlayerProfile).all()
     return {p.player_key: p for p in profiles}
+
+@app.get("/api/players/{player_key}/projections")
+@ttl_cache(ttl_seconds=3600)
+def get_player_projections(player_key: str, db: Session = Depends(get_db)):
+    from model.projections_model import predict_player_stats
+    player = db.query(models.PlayerProfile).filter(models.PlayerProfile.player_key == player_key).first()
+    if not player:
+        return {"error": "Player not found"}
+    return predict_player_stats(player)
+
+@app.get("/api/predictions")
+@ttl_cache(ttl_seconds=3600)
+def get_all_predictions(db: Session = Depends(get_db)):
+    from model.projections_model import predict_player_stats
+    players = db.query(models.PlayerProfile).all()
+    
+    predictions = []
+    for p in players:
+        season = p.season if p.season else {}
+        if float(season.get('pts', 0)) > 15.0:
+            projs = predict_player_stats(p)
+            predictions.append({
+                "player_key": p.player_key,
+                "name": p.name,
+                "team": p.team,
+                "pos": p.pos,
+                "actual": {
+                    "pts": float(season.get('pts', 0)),
+                    "reb": float(season.get('reb', 0)),
+                    "ast": float(season.get('ast', 0)),
+                },
+                "projected": projs
+            })
+    return predictions
+
+@app.get("/api/games/predict/{home_id}/{away_id}")
+def predict_game_matchup(home_id: str, away_id: str, db: Session = Depends(get_db)):
+    from model.game_predictor import predict_game
+    home = db.query(models.TeamProfile).filter(models.TeamProfile.team_id == home_id).first()
+    away = db.query(models.TeamProfile).filter(models.TeamProfile.team_id == away_id).first()
+    if not home or not away:
+        return {"error": "Team not found"}
+    return predict_game(home, away)
 
 @app.post("/api/simulate")
 def simulate_xpts(request: Dict[str, Any]):
