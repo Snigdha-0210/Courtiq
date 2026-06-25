@@ -37,7 +37,10 @@ def get_games(db: Session = Depends(get_db)):
 @app.get("/api/games/{game_id}")
 def get_game_boxscore(game_id: str):
     from pipeline.nba_fetcher import fetch_boxscore
-    box = fetch_boxscore(game_id)
+    # nba_api expects a 10-digit game_id (e.g. "0042300226")
+    # The frontend passes the integer ID (e.g. "42300226")
+    padded_game_id = game_id.zfill(10)
+    box = fetch_boxscore(padded_game_id)
     if box:
         return box
     return {"error": "Failed to fetch boxscore"}
