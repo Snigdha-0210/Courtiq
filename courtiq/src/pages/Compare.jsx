@@ -38,13 +38,24 @@ function StatBar({ valA, valB, higherBetter }) {
 }
 
 export default function Compare() {
+  const PLAYERS = [
+    { key: "curry", label: "Stephen Curry — GSW" },
+    { key: "james", label: "LeBron James — LAL" },
+    { key: "jokić", label: "Nikola Jokić — DEN" },
+    { key: "dončić", label: "Luka Dončić — DAL" }
+  ];
+
+  const [playerAKey, setPlayerAKey] = useState("curry");
+  const [playerBKey, setPlayerBKey] = useState("james");
+  const [season, setSeason] = useState("2024-25 Season");
   const [players, setPlayers] = useState({ a: null, b: null });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
-      fetch(`${import.meta.env.VITE_API_URL}/players/curry`).then(r => r.json()),
-      fetch(`${import.meta.env.VITE_API_URL}/players/james`).then(r => r.json())
+      fetch(`${import.meta.env.VITE_API_URL}/players/${encodeURIComponent(playerAKey)}?season=${encodeURIComponent(season)}`).then(r => r.json()),
+      fetch(`${import.meta.env.VITE_API_URL}/players/${encodeURIComponent(playerBKey)}?season=${encodeURIComponent(season)}`).then(r => r.json())
     ]).then(([playerA, playerB]) => {
       setPlayers({ a: playerA, b: playerB });
       setLoading(false);
@@ -52,7 +63,7 @@ export default function Compare() {
       console.error("Failed to fetch players", err);
       setLoading(false);
     });
-  }, []);
+  }, [playerAKey, playerBKey, season]);
 
   if (loading || !players.a || !players.b) {
     return <div className="p-10 text-white font-display text-xl">Loading comparison data...</div>;
@@ -63,10 +74,30 @@ export default function Compare() {
   return (
     <div className="animate-fade-in max-w-screen-xl mx-auto">
       {/* Header */}
+      <div className="flex justify-end pt-4 pr-6 pb-2 border-b border-gray-800">
+        <select 
+          value={season}
+          onChange={e => setSeason(e.target.value)}
+          className="bg-black border border-gray-700 text-white text-[12px] px-3 py-2 rounded font-body outline-none focus:border-accent">
+          <option>2024-25 Season</option>
+          <option>2023-24 Season</option>
+          <option>2022-23 Season</option>
+        </select>
+      </div>
       <div className="grid grid-cols-[1fr_60px_1fr] border-b border-gray-800">
         {/* Player A */}
         <div className="p-6 bg-accent/5">
-          <div className="text-[10px] text-accent font-black tracking-[0.14em] uppercase mb-2">Player A</div>
+          <div className="flex justify-between items-start mb-2">
+            <div className="text-[10px] text-accent font-black tracking-[0.14em] uppercase">Player A</div>
+            <select 
+              value={playerAKey} 
+              onChange={e => setPlayerAKey(e.target.value)}
+              className="bg-black border border-gray-700 text-white text-[10px] px-2 py-1 rounded font-body outline-none focus:border-accent">
+              {PLAYERS.map(player => (
+                <option key={player.key} value={player.key}>{player.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="font-display text-[44px] font-black uppercase leading-[0.9]">{a.firstName}<br/>{a.lastName}</div>
           <div className="text-[12px] text-gray-400 mt-2">{a.pos} · {a.team}</div>
           <div className="flex gap-4 mt-4">
@@ -84,7 +115,17 @@ export default function Compare() {
         </div>
         {/* Player B */}
         <div className="p-6 text-right">
-          <div className="text-[10px] text-gray-400 font-black tracking-[0.14em] uppercase mb-2">Player B</div>
+          <div className="flex justify-between items-start mb-2 flex-row-reverse">
+            <div className="text-[10px] text-gray-400 font-black tracking-[0.14em] uppercase">Player B</div>
+            <select 
+              value={playerBKey} 
+              onChange={e => setPlayerBKey(e.target.value)}
+              className="bg-black border border-gray-700 text-white text-[10px] px-2 py-1 rounded font-body outline-none focus:border-accent text-right">
+              {PLAYERS.map(player => (
+                <option key={player.key} value={player.key}>{player.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="font-display text-[44px] font-black uppercase leading-[0.9]">{b.name.split(" ")[0]}<br/>{b.name.split(" ").slice(1).join(" ")}</div>
           <div className="text-[12px] text-gray-400 mt-2">{b.pos} · {b.team}</div>
           <div className="flex gap-4 mt-4 justify-end">

@@ -103,6 +103,26 @@ def seed_real_data():
             ))
         db.commit()
 
+        logger.info("Seeding Injury Report...")
+        injuries = [
+            { "name":"Kawhi Leonard",     "team":"LAC", "status":"out",  "injury":"Knee",    "return":"Unknown" },
+            { "name":"Damian Lillard",    "team":"MIL", "status":"ques", "injury":"Achilles","return":"Day-to-Day" },
+            { "name":"Paul George",       "team":"PHI", "status":"prob", "injury":"Knee",    "return":"Tonight" },
+            { "name":"Zion Williamson",   "team":"NOP", "status":"out",  "injury":"Hamstring","return":"2 weeks" },
+            { "name":"Ben Simmons",       "team":"BKN", "status":"out",  "injury":"Back",    "return":"Unknown" },
+            { "name":"Anthony Davis",     "team":"LAL", "status":"ques", "injury":"Foot",    "return":"Day-to-Day" },
+            { "name":"Ja Morant",         "team":"MEM", "status":"out",  "injury":"Shoulder","return":"Season" },
+        ]
+        for inj in injuries:
+            db.add(models.Injury(
+                name=inj["name"],
+                team=inj["team"],
+                status=inj["status"],
+                injury=inj["injury"],
+                return_date=inj["return"]
+            ))
+        db.commit()
+
         logger.info("Database successfully seeded with real NBA data!")
     except Exception as e:
         logger.error(f"Error seeding database: {e}")

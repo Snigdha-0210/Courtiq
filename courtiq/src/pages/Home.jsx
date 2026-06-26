@@ -23,7 +23,7 @@ function GameCard({ game }) {
         {[["away", game.away, game.as, game.aRec, aWin], ["home", game.home, game.hs, game.hRec, hWin]].map(([side, abbr, score, rec, win]) => (
           <div key={side} className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <span className={clsx("font-display text-[17px] font-black tracking-wide", win ? "text-white" : "text-gray-400")}>{abbr}</span>
+              <span onClick={(e) => { e.stopPropagation(); navigate("/team/" + abbr.toLowerCase()); }} className={clsx("font-display text-[17px] font-black tracking-wide cursor-pointer hover:text-accent transition-colors", win ? "text-white" : "text-gray-400")}>{abbr}</span>
               <span className="text-[10px] text-gray-600">{rec}</span>
             </div>
             <span className={clsx("font-display text-[26px] font-black leading-none", win ? "text-accent" : game.live ? "text-white" : "text-gray-300")}>
@@ -37,10 +37,23 @@ function GameCard({ game }) {
           <div className="h-full bg-accent/60 rounded-full transition-all" style={{ width: `${pct}%` }} />
         </div>
       )}
+      {game.home_win_prob !== undefined && game.away_win_prob !== undefined && (
+        <div className="mt-3 bg-gray-950 p-2 rounded border border-gray-800">
+          <div className="flex justify-between items-center text-[9px] font-bold tracking-widest text-gray-500 mb-1 uppercase">
+            <span>{game.away} Prob {game.away_win_prob}%</span>
+            <span className="text-accent">AI PREDICTION</span>
+            <span>{game.home} Prob {game.home_win_prob}%</span>
+          </div>
+          <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden flex">
+            <div className="h-full bg-gray-500 transition-all" style={{ width: `${game.away_win_prob}%` }} />
+            <div className="h-full bg-accent transition-all" style={{ width: `${game.home_win_prob}%` }} />
+          </div>
+        </div>
+      )}
       {game.live && (
         <div className="mt-3 pt-3 border-t border-gray-800 flex justify-between">
-          <span className="text-[10px] text-gray-500">{game.aLeader}</span>
-          <span className="text-[10px] text-gray-500">{game.hLeader}</span>
+          <span onClick={(e) => { e.stopPropagation(); if (game.aLeader) navigate("/player/" + game.aLeader.split(' ')[1].toLowerCase()); }} className="text-[10px] text-gray-500 cursor-pointer hover:text-accent transition-colors">{game.aLeader}</span>
+          <span onClick={(e) => { e.stopPropagation(); if (game.hLeader) navigate("/player/" + game.hLeader.split(' ')[1].toLowerCase()); }} className="text-[10px] text-gray-500 cursor-pointer hover:text-accent transition-colors">{game.hLeader}</span>
         </div>
       )}
       <div className="mt-2 flex justify-between items-center">
@@ -52,9 +65,10 @@ function GameCard({ game }) {
 }
 
 function LeaderRow({ player, rank, max }) {
+  const navigate = useNavigate();
   const barWidth = Math.round((player.val / max) * 100);
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-900 cursor-pointer group">
+    <div onClick={() => navigate("/player/" + player.name.split(' ')[1].toLowerCase())} className="flex items-center gap-3 py-2.5 border-b border-gray-900 cursor-pointer group hover:bg-gray-900/40 rounded px-1 -mx-1 transition-colors">
       <span className={clsx("font-display text-[20px] font-black w-7 text-center", rank <= 3 ? "text-accent" : "text-gray-700")}>
         {rank}
       </span>
@@ -74,10 +88,11 @@ function LeaderRow({ player, rank, max }) {
 }
 
 function MiniStandRow({ team, rank, isPlayoffLine }) {
+  const navigate = useNavigate();
   const pct = (team.w / (team.w + team.l)).toFixed(3).slice(1);
   const top = rank === 1;
   return (
-    <div className={clsx("flex justify-between items-center py-1.5 border-b text-[12px] cursor-pointer hover:bg-gray-900/50 transition-colors px-1",
+    <div onClick={() => navigate("/team/" + team.t.toLowerCase())} className={clsx("flex justify-between items-center py-1.5 border-b text-[12px] cursor-pointer hover:bg-gray-900/50 transition-colors px-1",
       isPlayoffLine ? "border-accent/40" : "border-gray-900")}>
       <div className="flex items-center gap-2">
         <span className="text-gray-600 w-4 text-[11px]">{rank}</span>
@@ -197,6 +212,19 @@ export default function Home() {
                     <div className="font-display text-[15px] font-black text-gray-300 tracking-wide mt-1">{g.home}</div>
                   </div>
                 </div>
+                {g.home_win_prob !== undefined && g.away_win_prob !== undefined && (
+                  <div className="mt-4 pt-4 border-t border-gray-800">
+                    <div className="flex justify-between items-center text-[10px] font-bold tracking-widest text-gray-400 mb-1.5 uppercase">
+                      <span>{g.away_win_prob}%</span>
+                      <span className="text-accent text-[9px]">LIVE AI PROJECTION</span>
+                      <span className="text-white">{g.home_win_prob}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden flex">
+                      <div className="h-full bg-gray-500 transition-all" style={{ width: `${g.away_win_prob}%` }} />
+                      <div className="h-full bg-accent transition-all" style={{ width: `${g.home_win_prob}%` }} />
+                    </div>
+                  </div>
+                )}
                 <div className="mt-4 pt-4 border-t border-gray-800 flex justify-between text-[11px] text-gray-500">
                   <span>{g.aLeader}</span>
                   <span>{g.hLeader}</span>

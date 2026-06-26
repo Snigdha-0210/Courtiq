@@ -33,7 +33,7 @@ export default function Navbar() {
       {/* Nav links */}
       <div className="flex flex-1 overflow-x-auto no-scrollbar">
         {NAV_LINKS.map((l) => {
-          const active = location.pathname === l.path;
+          const active = location.pathname === l.path || (l.path !== "/" && location.pathname.startsWith(l.path));
           return (
             <button
               key={l.path}
@@ -60,8 +60,15 @@ export default function Navbar() {
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search player, team…"
-              className="bg-transparent text-white text-xs w-44 placeholder-gray-600"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && search.trim()) {
+                  navigate(`/player/${search.trim().toLowerCase()}`);
+                  setSearchOpen(false);
+                  setSearch("");
+                }
+              }}
+              placeholder="Search player (e.g. james, luka)..."
+              className="bg-transparent text-white text-xs w-56 placeholder-gray-600 outline-none"
             />
             <button onClick={() => { setSearchOpen(false); setSearch(""); }}>
               <X size={12} className="text-gray-500 hover:text-white transition-colors" />

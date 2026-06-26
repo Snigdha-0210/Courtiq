@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import clsx from "clsx";
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
 ];
 
 export default function Leaders() {
+  const navigate = useNavigate();
   const [stat, setStat] = useState("pts");
   const [leadersMap, setLeadersMap] = useState({});
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function Leaders() {
             const medals = ["🥇","🥈","🥉"];
             const sizes  = ["text-[56px]","text-[44px]","text-[44px]"];
             return (
-              <div key={p.name} className={clsx("bg-gray-900 border rounded p-5 text-center", i===0?"border-accent/50":"border-gray-800")}>
+              <div key={p.name} onClick={() => navigate(`/player/${p.name.split(' ')[1].toLowerCase()}`)} className={clsx("bg-gray-900 border rounded p-5 text-center cursor-pointer hover:border-accent transition-colors", i===0?"border-accent/50":"border-gray-800")}>
                 <div className="text-2xl mb-2">{medals[i]}</div>
                 <div className="w-14 h-14 rounded-full bg-gray-800 border border-gray-700 flex items-center justify-center font-display text-[18px] font-black text-gray-300 mx-auto mb-3">
                   {p.init}
@@ -83,7 +85,7 @@ export default function Leaders() {
           {data.map((p, i) => {
             const barW = Math.round((p.val / max) * 100);
             return (
-              <div key={p.name} className="flex items-center gap-4 py-3 border-b border-gray-900 hover:bg-gray-900/40 transition-colors px-2 rounded cursor-pointer group">
+              <div key={p.name} onClick={() => navigate(`/player/${p.name.split(' ')[1].toLowerCase()}`)} className="flex items-center gap-4 py-3 border-b border-gray-900 hover:bg-gray-900/40 transition-colors px-2 rounded cursor-pointer group">
                 <span className={clsx("font-display text-[22px] font-black w-8 text-center flex-shrink-0", i<3?"text-accent":"text-gray-700")}>
                   {i + 1}
                 </span>

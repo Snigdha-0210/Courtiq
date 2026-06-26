@@ -20,6 +20,8 @@ class GameSchema(BaseModel):
     hLeader: str
     aLeader: str
     qtrs: Qtrs
+    home_win_prob: Optional[float] = None
+    away_win_prob: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -58,7 +60,7 @@ class InjurySchema(BaseModel):
     team: str
     status: str
     injury: str
-    return_: str = Field(..., alias="return_date")
+    return_: str = Field(..., validation_alias="return_date", serialization_alias="return")
 
     class Config:
         from_attributes = True

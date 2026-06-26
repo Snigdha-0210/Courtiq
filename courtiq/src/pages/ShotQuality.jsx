@@ -8,12 +8,22 @@ import clsx from "clsx";
 const RATING_VARIANT = { ELITE:"elite", GOOD:"good", AVG:"avg", POOR:"poor" };
 
 export default function ShotQuality() {
+  const [playerKey, setPlayerKey] = useState("curry");
+  const [season, setSeason] = useState("2024-25 Season");
   const [playerData, setPlayerData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sliders, setSliders] = useState({ midrange:12, corner3:15, break3:33, rim:27 });
 
+  const PLAYERS = [
+    { key: "curry", label: "Stephen Curry — GSW" },
+    { key: "james", label: "LeBron James — LAL" },
+    { key: "jokić", label: "Nikola Jokić — DEN" },
+    { key: "dončić", label: "Luka Dončić — DAL" }
+  ];
+
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/players/curry`)
+    setLoading(true);
+    fetch(`${import.meta.env.VITE_API_URL}/players/${encodeURIComponent(playerKey)}?season=${encodeURIComponent(season)}`)
       .then(res => res.json())
       .then(data => {
         setPlayerData(data);
@@ -23,21 +33,35 @@ export default function ShotQuality() {
         console.error("Failed to fetch player", err);
         setLoading(false);
       });
-  }, []);
+  }, [playerKey, season]);
 
   const updateSlider = (key, val) => setSliders(prev => ({ ...prev, [key]: Number(val) }));
 
   if (loading || !playerData) {
-    return <div className="p-10 text-white font-display text-xl">Loading shot quality model...</div>;
+    return (
+      <div className="flex justify-center items-center h-screen bg-black">
+        <div className="font-display text-xl text-accent animate-pulse tracking-widest">LOADING ENGINE...</div>
+      </div>
+    );
   }
 
   const p = playerData;
   const s = p.season || {};
 
-  const base = s.pts || 0;
+  const base = s.pts ? parseFloat(s.pts) : 0;
   const delta = ((sliders.corner3 - 15) * 0.06) + ((sliders.break3 - 33) * 0.03) + ((sliders.rim - 27) * 0.04) - ((sliders.midrange - 12) * 0.05);
   const projected = Math.max(18, Math.min(42, base + delta)).toFixed(1);
   const diff = (projected - base).toFixed(1);
+  
+  // Calculate aggregate expected values based on zones
+  const totalFga = p.zones?.reduce((sum, z) => sum + (z.fga || 0), 0) || 1;
+  const expectedPpg = (p.zones?.reduce((sum, z) => {
+    const is3pt = z.zone.includes("3") || z.zone.includes("Backcourt");
+    const xpps = ((z.xfgp || 0) / 100) * (is3pt ? 3 : 2);
+    return sum + (xpps * (z.fga || 0));
+  }, 0) || 0) / (s.gp || 1);
+  
+  const expectedFgp = p.zones?.reduce((sum, z) => sum + ((z.xfgp || 0) * (z.fga || 0)), 0) / totalFga;
 
   return (
     <div className="animate-fade-in">
@@ -55,13 +79,18 @@ export default function ShotQuality() {
               </p>
             </div>
             <div className="flex gap-3 flex-wrap">
-              <select className="bg-black border border-gray-700 text-white text-[12px] px-3 py-2 rounded font-body">
-                <option>Stephen Curry — GSW</option>
-                <option>LeBron James — LAL</option>
-                <option>Nikola Jokić — DEN</option>
-                <option>Luka Dončić — DAL</option>
+              <select 
+                value={playerKey} 
+                onChange={e => setPlayerKey(e.target.value)}
+                className="bg-black border border-gray-700 text-white text-[12px] px-3 py-2 rounded font-body outline-none focus:border-accent">
+                {PLAYERS.map(player => (
+                  <option key={player.key} value={player.key}>{player.label}</option>
+                ))}
               </select>
-              <select className="bg-black border border-gray-700 text-white text-[12px] px-3 py-2 rounded font-body">
+              <select 
+                value={season}
+                onChange={e => setSeason(e.target.value)}
+                className="bg-black border border-gray-700 text-white text-[12px] px-3 py-2 rounded font-body outline-none focus:border-accent">
                 <option>2024-25 Season</option>
                 <option>2023-24 Season</option>
                 <option>2022-23 Season</option>
@@ -71,10 +100,10 @@ export default function ShotQuality() {
 
           {/* Key metrics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
-            <StatCard label="Actual PPG" value={s.pts} sub="From real shots taken" accentBorder />
-            <StatCard label="xPPG (Expected)" value="24.1" sub="By shot quality alone" accentBorder valueColor="text-green" />
-            <StatCard label="Actual FG%" value={s.fgp+"%"} delta={3.2} />
-            <StatCard label="Expected FG% (xFG%)" value="45.5%" sub="Shot quality-adjusted" />
+            <StatCard label="Actual PPG" value={s.pts ? Number(s.pts).toFixed(1) : "0"} sub="From real shots taken" accentBorder />
+            <StatCard label="xPPG (Expected)" value={expectedPpg ? expectedPpg.toFixed(1) : "0"} sub="By shot quality alone" accentBorder valueColor="text-green" />
+            <StatCard label="Actual FG%" value={s.fgp ? Number(s.fgp).toFixed(1) + "%" : "0%"} delta={3.2} />
+            <StatCard label="Expected FG% (xFG%)" value={expectedFgp ? expectedFgp.toFixed(1) + "%" : "0%"} sub="Shot quality-adjusted" />
           </div>
         </div>
       </div>
@@ -102,8 +131,10 @@ export default function ShotQuality() {
                   </tr>
                 </thead>
                 <tbody>
-                  {p.zones.map(z => {
-                    const diffVal = (z.pps - z.xpps).toFixed(2);
+                  {p.zones?.map(z => {
+                    const is3pt = z.zone.includes("3") || z.zone.includes("Backcourt");
+                    const xpps = ((z.xfgp || 0) / 100) * (is3pt ? 3 : 2);
+                    const diffVal = ((z.pps || 0) - xpps).toFixed(2);
                     const diffPos = diffVal >= 0;
                     return (
                       <tr key={z.zone} className="border-b border-gray-900 hover:bg-gray-900/50 transition-colors">
@@ -112,11 +143,11 @@ export default function ShotQuality() {
                         <td className="py-3 text-right font-bold">{z.fgp}%</td>
                         <td className="py-3 text-right text-gray-500">{z.xfgp}%</td>
                         <td className={clsx("py-3 text-right font-bold", z.pps > 1.1 ? "text-accent" : z.pps < 0.85 ? "text-red/80" : "text-white")}>{z.pps}</td>
-                        <td className="py-3 text-right text-gray-500">{z.xpps}</td>
+                        <td className="py-3 text-right text-gray-500">{xpps.toFixed(2)}</td>
                         <td className={clsx("py-3 text-right font-bold text-[11px]", diffPos ? "text-green" : "text-red")}>
                           {diffPos ? "+" : ""}{diffVal}
                         </td>
-                        <td className="py-3 text-right"><Badge label={z.rating} variant={RATING_VARIANT[z.rating]} /></td>
+                        <td className="py-3 text-right"><Badge label={z.rating} variant={RATING_VARIANT[z.rating] || "avg"} /></td>
                       </tr>
                     );
                   })}
@@ -139,7 +170,7 @@ export default function ShotQuality() {
           <div className="p-5 border-b border-gray-800 sticky top-[92px]">
             <div className="section-title mb-4">What-If Shot Simulator</div>
             <p className="text-[11px] text-gray-500 mb-5 leading-relaxed">
-              Adjust {p.firstName}'s shot distribution and see how their projected PPG changes.
+              Adjust {p.name?.split(' ')[0]}'s shot distribution and see how their projected PPG changes.
             </p>
             <div className="space-y-5">
               {[
