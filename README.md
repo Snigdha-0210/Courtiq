@@ -7,6 +7,10 @@
 
 CourtIQ is a premium, modern web dashboard for NBA enthusiasts. It tracks live game scores, team standings, league leaders, in-depth player statistics, team profiles, and shot quality metrics, bringing the entire basketball world into one sleek interface.
 
+## 📺 Demo Video
+
+[![CourtIQ Demo](https://img.youtube.com/vi/HlkzDIm6FhY/maxresdefault.jpg)](https://youtu.be/HlkzDIm6FhY?si=K12lAy-_k2NTURFR)
+
 ## 🚀 Features
 
 - **Live Scoreboard**: Real-time updates of NBA games happening today.
