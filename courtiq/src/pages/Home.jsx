@@ -124,8 +124,12 @@ export default function Home() {
   const [leaders, setLeaders] = useState({});
   const [injuries, setInjuries] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [slowLoading, setSlowLoading] = useState(false);
 
   useEffect(() => {
+    // If loading takes more than 3 seconds, the free Render backend is likely cold-starting.
+    const slowTimer = setTimeout(() => setSlowLoading(true), 3000);
+
     Promise.all([
       fetch(`${import.meta.env.VITE_API_URL}/games`).then(res => res.json()),
       fetch(`${import.meta.env.VITE_API_URL}/standings`).then(res => res.json()),
@@ -136,15 +140,28 @@ export default function Home() {
       setStandings(standingsData);
       setLeaders(leadersData);
       setInjuries(injuriesData);
+      clearTimeout(slowTimer);
       setLoading(false);
     }).catch(err => {
       console.error("Failed to fetch data", err);
+      clearTimeout(slowTimer);
       setLoading(false);
     });
+
+    return () => clearTimeout(slowTimer);
   }, []);
 
   if (loading) {
-    return <div className="p-10 text-white font-display text-xl">Loading live NBA data...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-20 text-center animate-fade-in">
+        <div className="text-white font-display text-2xl font-black mb-4">Loading live NBA data...</div>
+        {slowLoading && (
+          <div className="text-gray-400 max-w-md mx-auto text-sm bg-gray-900 border border-gray-800 p-4 rounded-md">
+            <span className="text-accent font-bold">Note:</span> The free cloud backend is currently waking up from sleep. This first load can take up to <strong>50 seconds</strong>. Please hold on!
+          </div>
+        )}
+      </div>
+    );
   }
 
   const data = leaders[leaderStat] || [];
